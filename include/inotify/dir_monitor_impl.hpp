@@ -5,6 +5,12 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 #pragma once
+#include <sys/inotify.h>
+#include <errno.h>
+
+#include <deque>
+#include <memory>
+#include <string>
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -12,23 +18,18 @@
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>
+#include <boost/move/unique_ptr.hpp>
+#include <boost/array.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 
-#include <array>
-#include <condition_variable>
-#include <deque>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
-
-#include <sys/inotify.h>
-#include <errno.h>
 
 namespace boost {
 namespace asio {
 
 class dir_monitor_impl :
-    public std::enable_shared_from_this<dir_monitor_impl>
+    public boost::enable_shared_from_this<dir_monitor_impl>
 {
 public:
     dir_monitor_impl()
@@ -50,7 +51,7 @@ public:
             boost::throw_exception(e);
         }
 
-        std::unique_lock<std::mutex> lock(watch_descriptors_mutex_);
+        boost::unique_lock<boost::mutex> lock(watch_descriptors_mutex_);
         watch_descriptors_.insert(watch_descriptors_t::value_type(wd, dirname));
         lock.unlock();
         check_sub_directory(dirname, true);
@@ -58,7 +59,7 @@ public:
 
     void remove_directory(const std::string &dirname)
     {
-        std::unique_lock<std::mutex> lock(watch_descriptors_mutex_);
+        boost::unique_lock<boost::mutex> lock(watch_descriptors_mutex_);
         watch_descriptors_t::right_map::iterator it = watch_descriptors_.right.find(dirname);
         if (it != watch_descriptors_.right.end())
         {
@@ -96,14 +97,14 @@ public:
         stream_descriptor_.reset();
         inotify_io_service_->stop();
 
-        std::unique_lock<std::mutex> lock(events_mutex_);
+        boost::unique_lock<boost::mutex> lock(events_mutex_);
         run_ = false;
         events_cond_.notify_all();
     }
 
     dir_monitor_event popfront_event(boost::system::error_code &ec)
     {
-        std::unique_lock<std::mutex> lock(events_mutex_);
+        boost::unique_lock<boost::mutex> lock(events_mutex_);
         while (run_ && events_.empty())
             events_cond_.wait(lock);
         dir_monitor_event ev;
@@ -120,7 +121,7 @@ public:
 
     void pushback_event(dir_monitor_event ev)
     {
-        std::unique_lock<std::mutex> lock(events_mutex_);
+        boost::unique_lock<boost::mutex> lock(events_mutex_);
         if (run_)
         {
             events_.push_back(ev);
@@ -187,23 +188,23 @@ private:
 
     std::string get_dirname(int wd)
     {
-        std::unique_lock<std::mutex> lock(watch_descriptors_mutex_);
+        boost::unique_lock<boost::mutex> lock(watch_descriptors_mutex_);
         watch_descriptors_t::left_map::iterator it = watch_descriptors_.left.find(wd);
         return it != watch_descriptors_.left.end() ? it->second : "";
     }
 
     int fd_;
-    std::unique_ptr<boost::asio::io_service> inotify_io_service_;
-    std::unique_ptr<boost::asio::posix::stream_descriptor> stream_descriptor_;
-    std::unique_ptr<boost::asio::io_service::work> inotify_work_;
-    std::thread inotify_work_thread_;
-    std::array<char, 4096> read_buffer_;
+    boost::movelib::unique_ptr<boost::asio::io_service> inotify_io_service_;
+    boost::movelib::unique_ptr<boost::asio::posix::stream_descriptor> stream_descriptor_;
+    boost::movelib::unique_ptr<boost::asio::io_service::work> inotify_work_;
+    boost::thread inotify_work_thread_;
+    boost::array<char, 4096> read_buffer_;
     std::string pending_read_buffer_;
-    std::mutex watch_descriptors_mutex_;
+    boost::mutex watch_descriptors_mutex_;
     typedef boost::bimap<int, std::string> watch_descriptors_t;
     watch_descriptors_t watch_descriptors_;
-    std::mutex events_mutex_;
-    std::condition_variable events_cond_;
+    boost::mutex events_mutex_;
+    boost::condition_variable events_cond_;
     bool run_;
     std::deque<dir_monitor_event> events_;
 };

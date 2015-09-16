@@ -7,15 +7,17 @@
 #pragma once
 
 #include "dir_monitor_impl.hpp"
+#include <memory>
+#include <string>
+#include <stdexcept>
+
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/move/unique_ptr.hpp>
 
-#include <memory>
-#include <string>
-#include <stdexcept>
-#include <thread>
 
 namespace boost {
 namespace asio {
@@ -49,7 +51,7 @@ public:
         async_monitor_thread_.join();
     }
 
-    typedef std::shared_ptr<DirMonitorImplementation> implementation_type;
+    typedef boost::shared_ptr<DirMonitorImplementation> implementation_type;
 
     void construct(implementation_type &impl)
     {
@@ -115,7 +117,7 @@ public:
         }
 
     private:
-        std::weak_ptr<DirMonitorImplementation> impl_;
+        boost::weak_ptr<DirMonitorImplementation> impl_;
         boost::asio::io_service &io_service_;
         boost::asio::io_service::work work_;
         Handler handler_;
@@ -133,8 +135,8 @@ private:
     }
 
     boost::asio::io_service async_monitor_io_service_;
-    std::unique_ptr<boost::asio::io_service::work> async_monitor_work_;
-    std::thread async_monitor_thread_;
+    boost::movelib::unique_ptr<boost::asio::io_service::work> async_monitor_work_;
+    boost::thread async_monitor_thread_;
 };
 
 template <typename DirMonitorImplementation>
