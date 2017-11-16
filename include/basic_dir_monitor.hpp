@@ -98,6 +98,11 @@ public:
     {
         this->get_service().async_monitor(this->get_implementation(), handler);
     }
+
+    void destroy()
+    {
+        this->get_service().destroy(this->get_implementation());
+    }
 };
 
 }
